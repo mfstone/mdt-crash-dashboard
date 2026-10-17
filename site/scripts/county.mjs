@@ -28,3 +28,33 @@ if (!('county' in raw)) {
 }
 
 export const county = derive(raw);
+
+/* The config names a county; the bundle was BUILT for one. Nothing downstream
+   compares them, and every string a reader sees comes from the first while
+   every number comes from the second -- so a build after `npm run setup` and
+   before `npm run data` produces a page headed "Gallatin County Crash
+   Explorer" over Missoula's 26,996 crashes, with no warning anywhere.
+   `npm start` rebuilds the data when the config is newer, but a bare
+   `npm run build` does not, and CI would not catch it either: its config and
+   its committed bundle agree.
+ *
+ * This is the failure the config validator exists to prevent, arriving one
+ * step later. Checked here rather than in the page because it costs a file
+ * read and stops the build before Vite starts. */
+const BUNDLE = join(here, '..', 'public', 'data', 'meta.json');
+let meta;
+try { meta = JSON.parse(readFileSync(BUNDLE, 'utf8')); }
+catch {
+  throw new Error('No data bundle at site/public/data/meta.json.\n'
+    + '  Run "npm run data" to build one.');
+}
+const builtFor = meta.scope?.name ?? null;
+if ((builtFor ?? null) !== (county.county ?? null)) {
+  const name = (c) => (c == null ? 'statewide' : `${c} County`);
+  throw new Error(
+    `crashmap.config.json says ${name(county.county)}, but the data bundle was `
+    + `built for ${name(builtFor)}.\n`
+    + '  Every label would come from the config and every number from the '
+    + 'bundle.\n'
+    + '  Run "npm run data" to rebuild the bundle for the configured county.');
+}
