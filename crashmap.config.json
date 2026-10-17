@@ -1,0 +1,20 @@
+{
+  "county": "Missoula",
+  "source": {
+    "kind": "url"
+  },
+  "tables": [
+    "crash",
+    "vehicle",
+    "person"
+  ],
+  "theme": {
+    "primary": "#002F6C",
+    "secondary": "#EAAA00",
+    "accent": "#B9975B"
+  },
+  "basemaps": [
+    "openfreemap-liberty",
+    "openfreemap-positron"
+  ]
+}

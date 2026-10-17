@@ -1,0 +1,26 @@
+{
+  "name": "mdt-crash-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A local crash dashboard for any Montana county, built from MDT's published data.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "site"
+  ],
+  "scripts": {
+    "setup": "node pipeline/wizard.mjs",
+    "data": "node pipeline/build.mjs",
+    "start": "node pipeline/start.mjs",
+    "build": "npm run build --workspace site",
+    "test": "node pipeline/test.mjs"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "hyparquet-writer": "^0.16.12",
+    "proj4": "^2.22.0"
+  }
+}

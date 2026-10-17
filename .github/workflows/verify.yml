@@ -1,0 +1,32 @@
+name: verify
+
+# Every push and every pull request. The dashboard has no server and no test
+# database: the only way to know it works is to build it and drive the real
+# page, which is what the composite action does.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-and-test
+
+      # Screenshots are the quickest way to see WHY a run failed, so they are
+      # kept either way rather than only on success.
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: site/test-output/
+          retention-days: 14
+          if-no-files-found: ignore

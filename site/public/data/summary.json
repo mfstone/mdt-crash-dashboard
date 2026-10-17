@@ -1,0 +1,40 @@
+{
+ "statewide": {
+  "total": 26996,
+  "K": 144,
+  "A": 829,
+  "B": 2215,
+  "C": 3317,
+  "O": 19268,
+  "U": 1223,
+  "KA": 973,
+  "vru": 736,
+  "ped": 347,
+  "bike": 324,
+  "alcohol": 1906,
+  "intersection": 12186,
+  "wildlife": 2001,
+  "work_zone": 218
+ },
+ "counties": [
+  {
+   "county": "Missoula",
+   "total": 26996,
+   "K": 144,
+   "A": 829,
+   "B": 2215,
+   "C": 3317,
+   "O": 19268,
+   "U": 1223,
+   "KA": 973,
+   "vru": 736,
+   "ped": 347,
+   "bike": 324,
+   "alcohol": 1906,
+   "intersection": 12186,
+   "wildlife": 2001,
+   "work_zone": 218
+  }
+ ],
+ "cities": []
+}

@@ -1,0 +1,70 @@
+# --------------------------------------------------------------------------- #
+# Source workbooks
+# --------------------------------------------------------------------------- #
+# MDT's three published spreadsheets, ~150 MB, fetched by `npm run data` from
+# mdt.mt.gov. Not redistributed here: they are a third party's dataset, they
+# are revised in place without a version string, and a copy committed today is
+# a copy that quietly disagrees with the source in six months. data/.cache.json
+# records the ETag and mtime of what was fetched, so the next run knows whether
+# anything changed.
+#
+# Anchored with a leading slash. Unanchored, "data/" matches a directory of
+# that name at ANY depth -- which silently swallowed site/public/data, the one
+# generated directory this repo deliberately tracks.
+/data/
+
+# --------------------------------------------------------------------------- #
+# Build output
+# --------------------------------------------------------------------------- #
+node_modules/
+site/dist/
+site/.astro/
+
+# Screenshots the browser suites write on every run.
+site/test-output/
+test-output/
+
+# --------------------------------------------------------------------------- #
+# Generated from crashmap.config.json -- do not edit, do not commit
+# --------------------------------------------------------------------------- #
+# The identity palette, derived and contrast-checked by
+# site/scripts/build-theme.mjs. Committing it would let an edited copy outlive
+# the config it came from, which is the one thing the generator exists to
+# prevent. `npm run build` regenerates it.
+site/src/styles/theme.css
+
+# The Content Security Policy, written by site/scripts/build-headers.mjs from
+# the basemaps the config names. Same reason: a committed copy is one that
+# still permits the previous basemap's origins and not the current one's.
+site/public/_headers
+
+# --------------------------------------------------------------------------- #
+# Editors / OS
+# --------------------------------------------------------------------------- #
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+.env
+
+# --------------------------------------------------------------------------- #
+# What is deliberately NOT ignored
+# --------------------------------------------------------------------------- #
+# site/public/data/ -- the built bundle, ~700 KB, IS committed.
+#
+# It is generated output, which normally argues for ignoring it. Three things
+# argue louder the other way:
+#
+#   - Cloning and running it has to work. Rebuilding the bundle means a 150 MB
+#     download from MDT and several minutes of parsing; a reader who wants to
+#     see whether this is worth their time should not have to spend that first.
+#   - CI has to be able to run without reaching mdt.mt.gov at all. A test suite
+#     that fails when someone else's web server is down is a test suite people
+#     learn to ignore.
+#   - It is the fixture the decode suite checks the pipeline against. The whole
+#     point of that suite is that the committed bundle and freshly built one
+#     agree; it needs both.
+#
+# The tradeoff is that the committed bundle is one county's, built on one date.
+# meta.json records which, and when, and from what.

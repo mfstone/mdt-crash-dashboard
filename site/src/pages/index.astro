@@ -1,0 +1,369 @@
+---
+// MapLibre's stylesheet FIRST, ours second. Both style .maplibregl-* at the
+// same specificity, so the later import wins; with this the other way round
+// every control override below was dead and the zoom buttons, scale bar and
+// attribution kept MapLibre's hard-coded white through the dark theme.
+// Typefaces are self-hosted via @fontsource, not pulled from a font CDN, so
+// `font-src 'self'` stays absolute and the page makes no third-party request
+// to render text. Variable weights: one file covers the whole range.
+import '@fontsource-variable/inter';
+import 'maplibre-gl/dist/maplibre-gl.css';
+/* The generated theme comes FIRST, so app.css's own definitions win on equal
+   specificity and the two can be reconciled one token at a time. Importing it
+   last would silently override the whole hand-tuned stylesheet with derived
+   values, including the semantic ramps that are deliberately not brand
+   colours. */
+/* app.css first, theme.css second, and the order is load-bearing: both declare
+   on :root at equal specificity, so the later sheet wins. app.css holds the
+   semantic ramps and the layout; theme.css holds the identity tokens derived
+   from crashmap.config.json. Swapping these two lines silently pins the
+   dashboard to whatever brand app.css was last edited with. */
+import '../styles/app.css';
+import '../styles/theme.css';
+
+import county from '../lib/county.js';
+import summary from '../../public/data/summary.json';
+import { BASEMAPS } from '../lib/basemaps.js';
+
+/* The basemaps this build offers, named and labelled by the registry rather
+   than by two buttons with the words typed into them. A config that names
+   "carto-dark" produced a button reading "Minimal" for as long as those labels
+   were hardcoded.
+
+   `aria-pressed` here is only the initial paint. The reader's stored choice is
+   applied by initBasemapToggle once the page runs, which is also where a
+   stored id that is no longer configured falls back to the first. */
+const basemaps = (county.basemaps?.length ? county.basemaps : ['openfreemap-liberty'])
+  .map((id) => BASEMAPS[id])
+  .filter(Boolean);
+
+const title = county.title;
+/* The crash count comes from the built data rather than a number typed here.
+   A description that disagrees with the dashboard it describes is the kind of
+   error nobody notices, and it is the first thing a search result shows. */
+/* `statewide` is the build script's name for scope-wide totals; in a
+   county-scoped bundle it is this county's. */
+const total = Number(summary.statewide.total).toLocaleString('en-US');
+const description =
+  `Interactive map of ${county.shortName} crash records, 2016–2025, from MDT public data. `
+  + `Filter ${total} crashes by year, severity, geography and contributing factors.`;
+
+/* Link-preview tags are emitted only when crashmap.config.json sets "site".
+   A crawler resolves nothing relative to the page it fetched, so these need
+   absolute URLs -- and this tool normally runs on 127.0.0.1, where a canonical
+   link and a share card are at best meaningless and at worst a tag pointing at
+   somebody else's deployment. `?v=` is a cache-buster: Reddit, Facebook and
+   Slack cache a card per URL and will serve a stale one for days, so the
+   version is bumped whenever the picture changes.
+
+   The card itself is NOT in this repo -- it is a screenshot of a particular
+   county's dashboard, which is exactly the thing that stops being true when
+   somebody points this at their own. Drop a 1200x630 PNG at
+   site/public/social-card.png to turn these on. */
+const CARD_VERSION = '2026-10-09';
+const canonical = Astro.site ? new URL('/', Astro.site).href : null;
+const card = Astro.site
+  ? new URL(`/social-card.png?v=${CARD_VERSION}`, Astro.site).href : null;
+const cardAlt =
+  `The ${county.title} dashboard: a map of ${county.shortName} with every `
+  + `crash plotted by severity, beside totals and charts by year and hour.`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="color-scheme" content="light dark" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={title} />
+    {canonical && <link rel="canonical" href={canonical} />}
+    {canonical && <meta property="og:url" content={canonical} />}
+    {/* PNG rather than WebP: WebP support among link-preview crawlers is still
+        patchy, and a card that silently fails to render is the whole problem
+        this is fixing. The dimensions are declared so a crawler can lay the
+        card out before the image arrives. */}
+    {card && <meta property="og:image" content={card} />}
+    {card && <meta property="og:image:type" content="image/png" />}
+    {card && <meta property="og:image:width" content="1200" />}
+    {card && <meta property="og:image:height" content="630" />}
+    {card && <meta property="og:image:alt" content={cardAlt} />}
+    {card && <meta name="twitter:card" content="summary_large_image" />}
+    {card && <meta name="twitter:title" content={title} />}
+    {card && <meta name="twitter:description" content={description} />}
+    {card && <meta name="twitter:image" content={card} />}
+    {card && <meta name="twitter:image:alt" content={cardAlt} />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+
+  <body data-data-base="/data">
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <h1>{county.title}</h1>
+          <span class="vintage" id="vintage">loading…</span>
+        </div>
+        <span class="spacer"></span>
+        <span class="vintage" id="perf" aria-live="polite"></span>
+        {basemaps.length > 1 && (
+          <span class="segmented" role="group" aria-label="Basemap">
+            {basemaps.map((b, i) => (
+              <button type="button" data-basemap={b.id} title={b.note}
+                      aria-pressed={i === 0 ? 'true' : 'false'}>{b.label}</button>
+            ))}
+          </span>
+        )}
+        <button class="btn" id="copylink" type="button">Copy link</button>
+        <button class="btn" id="theme" type="button" aria-label="Toggle light and dark theme">
+          Theme
+        </button>
+        <button class="btn" id="tourbtn" type="button">Tutorial</button>
+        <button class="btn" id="aboutbtn" type="button">About &amp; caveats</button>
+      </header>
+
+      <!-- map -->
+      <div class="mapwrap">
+        <div id="map" role="region" aria-label="Map of Montana crash locations"></div>
+        <div class="loading" id="loading">
+          <div>Montana Crash Explorer</div>
+          <div class="bar"><i></i></div>
+          <div id="loadnote" style="color:var(--text-muted);font-size:11.5px">starting…</div>
+        </div>
+        <div class="pointnote" id="pointnote" aria-live="polite"></div>
+
+        <div class="maplegend" id="maplegend" hidden>
+          <button class="toggle" id="legendtoggle" type="button"
+                  aria-expanded="true" aria-controls="legendbody">Hide</button>
+          <div class="body" id="legendbody">
+            <div id="legend-roads">
+              <h4>Road segments</h4>
+              <div class="segmented linemode" role="group" aria-label="What the road lines show">
+                <button type="button" data-lines="count" aria-pressed="true">Count</button>
+                <button type="button" data-lines="rate" aria-pressed="false">Rate</button>
+              </div>
+              <div id="legend-count">
+                <div class="rows" id="legend-width"></div>
+                <div style="margin-top:9px">
+                  <div class="ramp" id="legend-ramp"></div>
+                  <div class="ramplabels"><span>0</span><span>12+ fatal / serious</span></div>
+                </div>
+              </div>
+              <div id="legend-rate" hidden>
+                <div class="rows" id="legend-rate-rows"></div>
+                <p class="note" id="legend-rate-note"></p>
+              </div>
+              <p class="note" id="legend-note"></p>
+            </div>
+            <div id="legend-rising" hidden>
+              <h4>Change in fatal + serious</h4>
+              <div class="ramp" id="legend-divramp"></div>
+              <div class="ramplabels"><span>fewer</span><span>no change</span><span>more</span></div>
+            </div>
+            <div id="legend-marks" hidden>
+              <h4>Ranked locations</h4>
+              <div class="rows">
+                <div class="row">
+                  <i class="dot" style="background:var(--report-mark)"></i>
+                  <span>Top 25, largest = rank 1</span>
+                </div>
+              </div>
+            </div>
+            <h4>Crash points</h4>
+            <div class="segmented linemode" id="pmodebar" role="group" aria-label="How crashes are drawn">
+              <button type="button" data-pmode="points" aria-pressed="true">Points</button>
+              <button type="button" data-pmode="heat" aria-pressed="false">Heatmap</button>
+            </div>
+            <div class="rows" id="legend-sev"></div>
+            <div id="legend-heat" hidden>
+              <div class="heatramp"></div>
+              <div class="ramplabels"><span>fewer</span><span>more crashes</span></div>
+            </div>
+            <button class="btn planbtn" id="lrtptoggle" type="button"
+                    aria-pressed="false" hidden>Planned projects</button>
+            <div id="legend-plan" hidden>
+              <div class="rows">
+                <label class="row plan-toggle">
+                  <input type="checkbox" data-plan="committed" checked>
+                  <span class="plan-key committed"></span><span>Committed</span>
+                </label>
+                <label class="row plan-toggle">
+                  <input type="checkbox" data-plan="proposed" checked>
+                  <span class="plan-key"></span><span>Recommended or proposed</span>
+                </label>
+              </div>
+              <p class="note">Planned work, not crash data.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="side" id="side">
+      <button class="sheet-handle" id="sheethandle" type="button"
+              aria-expanded="false" aria-controls="side">
+        <span class="grip" aria-hidden="true"></span>
+        <span class="sheet-label" id="sheetlabel">Filters &amp; charts</span>
+      </button>
+
+      <!-- charts / reports -->
+      <section class="panel" aria-label="Summary and reports">
+        <div class="modebar" id="modebar" role="group" aria-label="View mode"></div>
+
+        <div class="tiles">
+          <div class="tile">
+            <div class="k">Crashes</div>
+            <div class="v" id="t-total">—</div>
+          </div>
+          <div class="tile">
+            <div class="k">Fatal + serious</div>
+            <div class="v" id="t-ka">—</div>
+            <div class="sub"><span id="t-kashare">—</span> of crashes</div>
+          </div>
+          <div class="tile">
+            <div class="k">Fatal crashes</div>
+            <div class="v" id="t-k">—</div>
+            <div class="sub" id="t-k-sub"></div>
+          </div>
+          <div class="tile">
+            <div class="k">Filter</div>
+            <div class="v is-prose">
+              <button class="chip" id="ctypechip" type="button" hidden></button>
+              <span class="hint">Click a bar below to filter</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="report" id="report" hidden></div>
+
+        <div id="charts">
+        <div class="card">
+          <header>
+            <h3>Crashes by year</h3>
+            <button class="tablebtn" type="button" data-table="year">Table</button>
+          </header>
+          <svg class="chart" id="c-year" role="img" aria-label="Crashes by year"></svg>
+          <div id="tb-year" hidden></div>
+        </div>
+
+        <div class="card">
+          <header>
+            <h3>Severity mix</h3>
+            <button class="tablebtn" type="button" data-table="sev">Table</button>
+          </header>
+          <svg class="chart" id="c-sev" role="img" aria-label="Share of crashes by KABCO severity"></svg>
+          <div class="legend" id="l-sev"></div>
+          <div id="tb-sev" hidden></div>
+        </div>
+
+        <div class="card">
+          <header>
+            <h3>Hour of day</h3>
+            <button class="tablebtn" type="button" data-table="hour">Table</button>
+          </header>
+          <svg class="chart" id="c-hour" role="img" aria-label="Crashes by hour of day"></svg>
+          <div id="tb-hour" hidden></div>
+        </div>
+
+        <div class="card">
+          <header>
+            <h3>Collision type</h3>
+            <button class="tablebtn" type="button" data-table="ctype">Table</button>
+          </header>
+          <svg class="chart" id="c-ctype" role="img" aria-label="Crashes by collision type"></svg>
+          <div id="tb-ctype" hidden></div>
+        </div>
+
+        <div class="card">
+          <header>
+            <h3>Counties</h3>
+            <button class="tablebtn" type="button" data-table="county">Table</button>
+          </header>
+          <svg class="chart" id="c-county" role="img" aria-label="Crashes by county"></svg>
+          <div id="tb-county" hidden></div>
+        </div>
+        </div>
+      </section>
+
+      <!-- filters -->
+      <aside class="rail" aria-label="Filters">
+        <!-- Every active filter, named and individually removable. Without it a
+             filter set by clicking a chart bar is invisible unless you happen to
+             look at the control it corresponds to. -->
+        <div class="group activefilters" id="activefilters" hidden>
+          <div class="label">
+            <span>Active filters</span>
+            <button id="reset" type="button">Clear all</button>
+          </div>
+          <div class="chips" id="activechips"></div>
+        </div>
+        <div class="group" id="yearsgroup">
+          <div class="label"><span>Years</span></div>
+          <div class="yearrow">
+            <output id="yearout" for="y0 y1">2016–2025</output>
+          </div>
+          <label class="vh" for="y0">Earliest year</label>
+          <input type="range" id="y0" />
+          <label class="vh" for="y1">Latest year</label>
+          <input type="range" id="y1" />
+        </div>
+
+        <div class="group">
+          <div class="label">
+            <span>Severity (KABCO)</span>
+            <button id="sevclear" type="button">All</button>
+          </div>
+          <div class="chips" id="sevchips" role="group" aria-label="Crash severity"></div>
+        </div>
+
+        <div class="group">
+          <div class="label">
+            <span>Factors</span>
+            <button id="facclear" type="button">Clear</button>
+          </div>
+          <div class="chips" id="facchips" role="group" aria-label="Contributing factors"></div>
+          <p style="font-size:11px;color:var(--text-muted);margin:8px 0 0">
+            Factors combine with AND. Alcohol, drug, distraction and fatigue
+            record the investigating officer's field assessment — not a
+            toxicology result or a conviction.
+          </p>
+        </div>
+
+        <div class="group">
+          <div class="label"><span>County</span></div>
+          <label class="vh" for="county">County</label>
+          <select id="county"></select>
+        </div>
+        <!-- Also settable by clicking a bar in the collision-type chart, but a
+             bare SVG rect cannot be focused or activated from a keyboard, so
+             that interaction alone left this filter unreachable. -->
+        <div class="group">
+          <div class="label"><span>Collision type</span></div>
+          <label class="vh" for="ctype">Collision type</label>
+          <select id="ctype"></select>
+        </div>
+      </aside>
+      </div>
+
+      <footer class="credit">
+        <span id="footnote"></span>
+        &nbsp;·&nbsp; <button class="linkbtn" id="aboutbtn2" type="button">Read the data caveats</button>
+      </footer>
+    </div>
+
+    <dialog class="sheet" id="about" aria-labelledby="abouth">
+      <button class="btn close" id="aboutclose" type="button">Close</button>
+      <div class="body" id="aboutbody"><h2 id="abouth">About</h2></div>
+      <div class="sheet-foot" id="aboutfoot" hidden>
+        <button class="btn" id="abouttour" type="button">Take the tour</button>
+        <button class="btn primary" id="aboutproceed" type="button">
+          Proceed to the dashboard
+        </button>
+      </div>
+    </dialog>
+
+    <script src="../lib/app.js"></script>
+  </body>
+</html>

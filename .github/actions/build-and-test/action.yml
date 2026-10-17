@@ -1,0 +1,52 @@
+name: Build and test
+description: >
+  Build the dashboard and drive the real page against it. A composite action
+  rather than inline steps so anything that gates a merge runs literally the
+  same sequence, and the two cannot drift apart.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        # Astro 7 refuses anything below 22.12; package.json says so too.
+        node-version: 22
+        cache: npm
+        cache-dependency-path: package-lock.json
+
+    # puppeteer-core ships no browser on purpose, so one has to be provided.
+    - uses: browser-actions/setup-chrome@v1
+      id: chrome
+      with:
+        chrome-version: stable
+
+    # One install at the workspace root covers the pipeline and the site.
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Build
+      shell: bash
+      run: npm run build
+
+    # The data bundle is committed, so CI never touches MDT: a run neither
+    # depends on a 150 MB download nor on their server being up. `npm run data`
+    # regenerates it, and the decode suite below is what proves the committed
+    # bundle still matches what the pipeline produces.
+    - name: Test
+      shell: bash
+      env:
+        CHROME: ${{ steps.chrome.outputs.chrome-path }}
+      # Starts scripts/serve-csp.mjs -- dist/ under the real public/_headers,
+      # NOT `astro preview`, which sends no security headers. The content
+      # security policy is the control this project leans on hardest, and the
+      # first production deploy of its ancestor died because WebAssembly was
+      # instantiated at import and nothing local had ever enforced the policy
+      # that refused it.
+      run: npm test
+
+    - name: Audit shipped dependencies
+      shell: bash
+      # Build-time advisories do not reach a reader of a static site; these are
+      # the packages that actually go into the browser.
+      run: npm audit --omit=dev --audit-level=high --workspace site
